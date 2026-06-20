@@ -13,11 +13,13 @@ export default function Priorities({ data, update }) {
     setLoading(true);
     setError("");
     try {
-      // Tasks come from both the to-do list and the unscheduled bank.
-      const tasks = [
-        ...data.tasks.map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, category: t.category })),
-        ...data.unscheduled.map((u) => ({ id: u.id, title: u.title, deadline: null, category: u.category })),
-      ];
+      // Send all items to the AI. `start` doubles as the deadline for urgency maths.
+      const tasks = data.items.map((i) => ({
+        id: i.id,
+        title: i.title,
+        deadline: i.start,    // null for unscheduled → not urgent
+        category: i.category,
+      }));
       setResults(await prioritize(tasks, data.priorities, data.categories));
     } catch {
       setError("Couldn't reach the AI. Is Ollama running and the backend started? (See README.)");
@@ -31,7 +33,9 @@ export default function Priorities({ data, update }) {
       <div className="row">
         <div className="col panel">
           <h3>Rank your priorities</h3>
-          <p style={{ fontSize: 12, color: "#666" }}>Drag to reorder. (Ties like 1 / 1 / 3 are kept in the data - the UI for editing ties is a next step.)</p>
+          <p style={{ fontSize: 12, color: "#666" }}>
+            Use ↑ / ↓ to reorder. The AI uses this ranking to judge how important each task is.
+          </p>
           <PriorityRanker priorities={data.priorities} data={data} update={update} />
         </div>
         <div className="col panel">

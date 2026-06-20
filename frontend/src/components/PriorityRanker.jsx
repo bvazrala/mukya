@@ -1,26 +1,41 @@
-const QUADRANTS = [
-  { key: "do", title: "Do — important & urgent", color: "#dbeac8" },
-  { key: "schedule", title: "Schedule — important, not urgent", color: "#f6c9c0" },
-  { key: "delegate", title: "Delegate — urgent, not important", color: "#f3d9a8" },
-  { key: "delete", title: "Delete — neither", color: "#bfe0e0" },
-];
+// Lets the user reorder their priorities with ↑ / ↓ buttons.
+// Ranks are normalised to 1, 2, 3… after every move so there are no gaps.
+export default function PriorityRanker({ priorities, data, update }) {
+  // Always display in rank order
+  const sorted = [...priorities].sort((a, b) => a.rank - b.rank);
 
-export default function EisenhowerMatrix({ results }) {
-  const inQuadrant = (k) => results.filter((r) => r.quadrant === k);
+  const move = (index, direction) => {
+    const next = [...sorted];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    // Swap the two entries in the array
+    [next[index], next[target]] = [next[target], next[index]];
+    // Reassign ranks so they're always 1, 2, 3…
+    update({ ...data, priorities: next.map((p, i) => ({ ...p, rank: i + 1 })) });
+  };
+
   return (
-    <div className="matrix">
-      {QUADRANTS.map((q) => (
-        <div key={q.key} className="quadrant" style={{ background: q.color }}>
-          <h4>{q.title}</h4>
-          {inQuadrant(q.key).length === 0 && <p style={{ fontSize: 12, color: "#777" }}>—</p>}
-          {inQuadrant(q.key).map((r) => (
-            <div key={r.id} className="item" title={r.reason}>
-              <strong>{r.title}</strong>
-              <div style={{ fontSize: 11, color: "#555" }}>
-                importance {r.importance}/10{r.urgent ? " · urgent" : ""} — {r.reason}
-              </div>
-            </div>
-          ))}
+    <div>
+      {sorted.map((p, i) => (
+        <div
+          key={p.label}
+          className="item"
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <span style={{ color: "#999", fontSize: 12, width: 24 }}>#{i + 1}</span>
+          <strong style={{ flex: 1 }}>{p.label}</strong>
+          <button
+            onClick={() => move(i, -1)}
+            disabled={i === 0}
+            title="Move up"
+            style={{ padding: "2px 8px" }}
+          >↑</button>
+          <button
+            onClick={() => move(i, 1)}
+            disabled={i === sorted.length - 1}
+            title="Move down"
+            style={{ padding: "2px 8px" }}
+          >↓</button>
         </div>
       ))}
     </div>

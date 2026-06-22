@@ -3,41 +3,37 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
-const STATUS_ORDER = ["unmarked", "green", "yellow", "red"];
-const COLORS = { unmarked: "#94a3b8", green: "#22c55e", yellow: "#eab308", red: "#ef4444" };
+import { STATUS_COLOR, cycledItem } from "../lib.js";
 
-export default function Calendar({ events, data, update }) {
-  const fcEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    start: e.start,
-    backgroundColor: COLORS[e.status] ?? COLORS.unmarked,
-    borderColor:     COLORS[e.status] ?? COLORS.unmarked,
-  }));
+export default function Calendar({ items, data, update }) {
+  const events = items.map((i) => {
+    const start = new Date(i.start);
+    const end = new Date(start.getTime() + (i.durationMin || 60) * 60000);
+    return {
+      id: i.id,
+      title: i.title,
+      start: i.start,
+      end: end.toISOString(),
+      backgroundColor: STATUS_COLOR[i.status],
+      borderColor: STATUS_COLOR[i.status],
+    };
+  });
 
-  // Click a calendar event to cycle its status (same logic as the to-do list).
-  const handleEventClick = ({ event }) => {
+  const onClick = ({ event }) =>
     update({
       ...data,
-      items: data.items.map((i) =>
-        i.id === event.id
-          ? { ...i, status: STATUS_ORDER[(STATUS_ORDER.indexOf(i.status) + 1) % STATUS_ORDER.length] }
-          : i
-      ),
+      items: data.items.map((i) => (i.id === event.id ? cycledItem(i) : i)),
     });
-  };
 
-  // An unscheduled item was dragged and dropped here — give it a start time.
-  const handleEventReceive = (info) => {
+  const onReceive = (info) => {
     update({
       ...data,
       items: data.items.map((i) =>
         i.id === info.event.id
-          ? { ...i, start: info.event.start.toISOString() }
+          ? { ...i, start: info.event.start.toISOString(), durationMin: 60 }
           : i
       ),
     });
-    // Remove FullCalendar's internally-added copy; React state drives the render.
     info.event.remove();
   };
 
@@ -46,12 +42,12 @@ export default function Calendar({ events, data, update }) {
       plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
       initialView="timeGridWeek"
       headerToolbar={{ left: "prev,next today", center: "title", right: "timeGridWeek,dayGridMonth" }}
-      events={fcEvents}
+      events={events}
       height={520}
-      nowIndicator={true}
-      droppable={true}
-      eventClick={handleEventClick}
-      eventReceive={handleEventReceive}
+      nowIndicator
+      droppable
+      eventClick={onClick}
+      eventReceive={onReceive}
     />
   );
 }

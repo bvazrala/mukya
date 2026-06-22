@@ -1,20 +1,11 @@
-"""
-Mukya backend - a small FastAPI service that runs the AI prioritization locally.
-
-Run it with:  uvicorn main:app --reload
-It talks to Ollama (gemma4) on your own machine. No API keys; nothing leaves your computer.
-"""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-import prioritize as p
+import prioritize
 
 app = FastAPI(title="Mukya")
 
-# Let the Vite dev server call this during development. (If you use Vite's proxy,
-# you won't even hit CORS - this is just a safety net for direct calls.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -23,10 +14,10 @@ app.add_middleware(
 )
 
 
-class Task(BaseModel):
+class Item(BaseModel):
     id: str
     title: str
-    deadline: str | None = None   # ISO date string, optional
+    type: str = "task"
     category: str | None = None
 
 
@@ -35,10 +26,19 @@ class Priority(BaseModel):
     label: str
 
 
-class PrioritizeRequest(BaseModel):
-    tasks: list[Task]
+class Goal(BaseModel):
+    id: str
+    text: str
+
+
+class Persona(BaseModel):
     priorities: list[Priority] = []
-    categories: list[str] = []
+    goals: list[Goal] = []
+
+
+class ClassifyRequest(BaseModel):
+    items: list[Item]
+    persona: Persona = Persona()
 
 
 class ChatMessage(BaseModel):
@@ -48,7 +48,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
-    priorities: list[Priority] = []
+    persona: Persona = Persona()
 
 
 @app.get("/api/health")
@@ -56,20 +56,13 @@ def health():
     return {"ok": True}
 
 
-@app.post("/api/prioritize")
-def prioritize_route(req: PrioritizeRequest):
-    results = p.prioritize(
-        [t.model_dump() for t in req.tasks],
-        [pr.model_dump() for pr in req.priorities],
-        req.categories,
-    )
-    return {"results": results}
+@app.post("/api/classify")
+def classify(req: ClassifyRequest):
+    items = [i.model_dump() for i in req.items]
+    return {"results": prioritize.classify(items, req.persona.model_dump())}
 
 
 @app.post("/api/chat")
-def chat_route(req: ChatRequest):
-    reply = p.chat(
-        [m.model_dump() for m in req.messages],
-        [pr.model_dump() for pr in req.priorities],
-    )
-    return {"reply": reply}
+def chat(req: ChatRequest):
+    messages = [m.model_dump() for m in req.messages]
+    return {"reply": prioritize.chat(messages, req.persona.model_dump())}

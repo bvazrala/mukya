@@ -1,58 +1,52 @@
 import { useEffect, useRef } from "react";
 import { Draggable } from "@fullcalendar/interaction";
 
-// Click to cycle status; drag onto the calendar to schedule.
-const ORDER = ["unmarked", "green", "yellow", "red"];
-const LABEL = { unmarked: "—", green: "done", yellow: "in progress", red: "missed" };
+import { cycledItem, STATUS_LABEL } from "../lib.js";
 
 export default function UnscheduledBank({ items, data, update }) {
-  const containerRef = useRef(null);
+  const ref = useRef(null);
 
   useEffect(() => {
-    // Register this container with FullCalendar so any .unscheduled-item inside
-    // it can be dragged onto the calendar.
-    const draggable = new Draggable(containerRef.current, {
-      itemSelector: ".unscheduled-item",
-      eventData: (el) => ({
-        id: el.dataset.id,
-        title: el.dataset.title,
-        duration: "01:00", // default block of 1 hour on drop
-      }),
+    const draggable = new Draggable(ref.current, {
+      itemSelector: ".draggable-item",
+      eventData: (el) => ({ id: el.dataset.id, title: el.dataset.title, duration: "01:00" }),
     });
     return () => draggable.destroy();
   }, []);
 
-  const cycle = (id) => {
-    update({
-      ...data,
-      items: data.items.map((i) =>
-        i.id === id
-          ? { ...i, status: ORDER[(ORDER.indexOf(i.status) + 1) % ORDER.length] }
-          : i
-      ),
-    });
+  const cycle = (id) =>
+    update({ ...data, items: data.items.map((i) => (i.id === id ? cycledItem(i) : i)) });
+
+  const remove = (id, e) => {
+    e.stopPropagation();
+    update({ ...data, items: data.items.filter((i) => i.id !== id) });
   };
 
   return (
-    <div ref={containerRef}>
+    <div ref={ref}>
       {items.map((u) => (
         <div
           key={u.id}
-          // "unscheduled-item" is the selector the Draggable instance targets
-          className={`item status-${u.status} unscheduled-item`}
+          className={`item status-${u.status} draggable-item`}
           data-id={u.id}
           data-title={u.title}
-          style={{ cursor: "pointer" }}
+          style={{ cursor: "grab" }}
           onClick={() => cycle(u.id)}
-          title="Click to change status · Drag onto the calendar to schedule"
+          title="Drag onto the calendar to schedule"
         >
-          <strong>{u.title}</strong>
-          <div style={{ fontSize: 12, color: "#666" }}>{u.category} · {LABEL[u.status]}</div>
+          <div className="item-row">
+            <strong>{u.title}</strong>
+            <button className="x" onClick={(e) => remove(u.id, e)} title="Delete">
+              ×
+            </button>
+          </div>
+          <div className="muted">
+            {u.category} · {u.type} · {STATUS_LABEL[u.status]}
+          </div>
         </div>
       ))}
-      <p style={{ fontSize: 12, color: "#999" }}>
-        Drag an item onto the calendar to schedule it. Click to change its status.
-      </p>
+      {items.length === 0 && <p className="muted">Nothing here yet.</p>}
+      <p className="muted">Drag an item onto the calendar to schedule it.</p>
     </div>
   );
 }

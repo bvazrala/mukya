@@ -1,22 +1,26 @@
 import { useState } from "react";
+
 import { chat } from "../api.js";
 
-export default function ChatBox({ priorities }) {
+export default function ChatBox({ persona }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const send = async () => {
     if (!input.trim()) return;
-    const next = [...messages, { role: "user", content: input }];
+    const next = [...messages, { role: "user", content: input.trim() }];
     setMessages(next);
     setInput("");
     setLoading(true);
     try {
-      const reply = await chat(next, priorities);
+      const reply = await chat(next, persona);
       setMessages([...next, { role: "assistant", content: reply }]);
     } catch {
-      setMessages([...next, { role: "assistant", content: "(Couldn't reach the AI — is the backend + Ollama running?)" }]);
+      setMessages([
+        ...next,
+        { role: "assistant", content: "Could not reach the AI. Check that Ollama and the backend are running." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -24,13 +28,20 @@ export default function ChatBox({ priorities }) {
 
   return (
     <div>
-      <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 8 }}>
+      <div style={{ maxHeight: 260, overflowY: "auto", marginBottom: 8 }}>
+        {messages.length === 0 && (
+          <p className="muted">Ask what to focus on, or let the AI ask you about your priorities.</p>
+        )}
         {messages.map((m, i) => (
-          <div key={i} className="item" style={{ background: m.role === "user" ? "#eef2ff" : "#f3f4f6" }}>
+          <div
+            key={i}
+            className="item"
+            style={{ background: m.role === "user" ? "#eef2ff" : "#f3f4f6" }}
+          >
             <strong>{m.role === "user" ? "You" : "AI"}:</strong> {m.content}
           </div>
         ))}
-        {loading && <p style={{ fontSize: 12, color: "#999" }}>Thinking...</p>}
+        {loading && <p className="muted">Thinking...</p>}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <input
@@ -38,9 +49,11 @@ export default function ChatBox({ priorities }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="e.g. Help me decide what matters most this week"
+          placeholder="Ask about your priorities or what to focus on"
         />
-        <button className="action" onClick={send} disabled={loading}>Send</button>
+        <button className="action" onClick={send} disabled={loading}>
+          Send
+        </button>
       </div>
     </div>
   );

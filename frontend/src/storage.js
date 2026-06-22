@@ -1,66 +1,73 @@
-// All app data lives in the browser via localStorage. No backend database.
-//
-// ONE unified items array. Each item: { id, title, start, status, category }
-//   start = ISO datetime string  →  item is scheduled (shows on calendar + to-do)
-//   start = null                 →  item is unscheduled (shows in the bank)
+const KEY = "mukya:v2";
 
-const KEY = "mukya:data";
+function iso(daysFromNow, hour, minute = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
 
-// Category values intentionally match the priority labels so sorting + AI work cleanly.
-// status: "unmarked" | "green" (done) | "yellow" (in progress) | "red" (missed)
-function seed() {
-  const today = new Date();
-  const iso = (daysFromNow, hour = 9) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + daysFromNow);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-  };
+export function makeItem(p = {}) {
   return {
+    id: crypto.randomUUID(),
+    title: p.title || "Untitled",
+    type: p.type || "task",
+    start: p.start ?? null,
+    durationMin: p.durationMin ?? null,
+    hardDeadline: p.hardDeadline ?? null,
+    softDeadline: p.softDeadline ?? null,
+    importance: p.importance ?? null,
+    importanceSetBy: p.importanceSetBy ?? null,
+    importanceReason: p.importanceReason ?? "",
+    status: p.status || "unmarked",
+    category: p.category || "Misc",
+    completedAt: p.completedAt ?? null,
+  };
+}
+
+function seed() {
+  return {
+    persona: {
+      priorities: [
+        { rank: 1, label: "Education" },
+        { rank: 2, label: "Working out" },
+        { rank: 3, label: "Sleeping" },
+      ],
+      goals: [{ id: crypto.randomUUID(), text: "Become a professional software engineer in 5 years" }],
+    },
+    categories: ["Education", "Working out", "Sleeping", "Misc"],
     items: [
-      // --- scheduled items (start set) — appear on calendar AND to-do list ---
-      { id: "e1", title: "Gym session",            start: iso(0, 7),  status: "green",    category: "Working out" },
-      { id: "e2", title: "CS61A lecture",           start: iso(0, 14), status: "yellow",   category: "Education"   },
-      { id: "e3", title: "Sleep by 11pm",           start: iso(0, 23), status: "unmarked", category: "Sleeping"    },
-      { id: "e4", title: "Project deadline",        start: iso(1, 17), status: "red",      category: "Education"   },
-      { id: "t1", title: "Finish problem set",      start: iso(1, 17), status: "unmarked", category: "Education"   },
-      { id: "t2", title: "Meal prep for the week",  start: iso(2, 18), status: "unmarked", category: "Working out" },
-      { id: "t3", title: "Reply to club emails",    start: iso(0, 20), status: "yellow",   category: "Misc"        },
-      // --- unscheduled items (start = null) — appear in the unscheduled bank ---
-      { id: "u1", title: "Read 20 pages", start: null, status: "unmarked", category: "Education" },
-      { id: "u2", title: "Call home",     start: null, status: "unmarked", category: "Misc"      },
+      makeItem({ title: "CS61A lecture", type: "event", category: "Education", start: iso(0, 14), durationMin: 60, status: "yellow" }),
+      makeItem({ title: "Morning gym session", type: "event", category: "Working out", start: iso(0, 7), durationMin: 60, status: "green" }),
+      makeItem({ title: "Lights out by 11pm", type: "commitment", category: "Sleeping", start: iso(0, 23), durationMin: 30 }),
+      makeItem({ title: "Finish problem set 4", type: "task", category: "Education", softDeadline: iso(1, 17), hardDeadline: iso(2, 17) }),
+      makeItem({ title: "Meal prep for the week", type: "task", category: "Working out", softDeadline: iso(2, 18) }),
+      makeItem({ title: "Reply to club emails", type: "task", category: "Misc", softDeadline: iso(0, 20) }),
+      makeItem({ title: "Read 20 pages of SICP", type: "task", category: "Education" }),
+      makeItem({ title: "Call home", type: "commitment", category: "Misc" }),
     ],
-    // Lower rank = more important. Labels intentionally match category values above.
-    priorities: [
-      { rank: 1, label: "Working out" },
-      { rank: 1, label: "Sleeping"    },
-      { rank: 3, label: "Education"   },
-    ],
-    categories: ["Working out", "Sleeping", "Education", "Misc"],
   };
 }
 
 export function loadData() {
-  const raw = localStorage.getItem(KEY);
-  if (!raw) {
-    const data = seed();
-    localStorage.setItem(KEY, JSON.stringify(data));
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return seed();
+    const data = JSON.parse(raw);
+    if (!data.persona || !Array.isArray(data.items)) return seed();
     return data;
+  } catch {
+    return seed();
   }
-  const data = JSON.parse(raw);
-  // Migrate old format (events / tasks / unscheduled) to unified items.
-  if (!data.items) {
-    localStorage.removeItem(KEY);
-    return loadData();
-  }
-  return data;
 }
 
 export function saveData(data) {
   localStorage.setItem(KEY, JSON.stringify(data));
+  return data;
 }
 
 export function resetData() {
-  localStorage.removeItem(KEY);
-  return loadData();
+  const fresh = seed();
+  saveData(fresh);
+  return fresh;
 }

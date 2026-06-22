@@ -1,33 +1,37 @@
-// Click a task to cycle its status: unmarked → green → yellow → red → unmarked
-const ORDER = ["unmarked", "green", "yellow", "red"];
-const LABEL = { unmarked: "—", green: "done", yellow: "in progress", red: "missed" };
+import { cycledItem, STATUS_LABEL } from "../lib.js";
 
-export default function TaskList({ tasks, data, update }) {
-  const cycle = (id) => {
-    update({
-      ...data,
-      items: data.items.map((i) =>
-        i.id === id
-          ? { ...i, status: ORDER[(ORDER.indexOf(i.status) + 1) % ORDER.length] }
-          : i
-      ),
-    });
+export default function TaskList({ items, data, update }) {
+  const cycle = (id) =>
+    update({ ...data, items: data.items.map((i) => (i.id === id ? cycledItem(i) : i)) });
+
+  const remove = (id, e) => {
+    e.stopPropagation();
+    update({ ...data, items: data.items.filter((i) => i.id !== id) });
   };
+
+  if (items.length === 0) return <p className="muted">Nothing scheduled yet.</p>;
 
   return (
     <div>
-      {tasks.map((t) => (
+      {items.map((t) => (
         <div
           key={t.id}
           className={`item status-${t.status}`}
           style={{ cursor: "pointer" }}
           onClick={() => cycle(t.id)}
+          title="Click to change status"
         >
-          <strong>{t.title}</strong>
-          <div style={{ fontSize: 12, color: "#666" }}>{t.category} · {LABEL[t.status]}</div>
+          <div className="item-row">
+            <strong>{t.title}</strong>
+            <button className="x" onClick={(e) => remove(t.id, e)} title="Delete">
+              ×
+            </button>
+          </div>
+          <div className="muted">
+            {t.category} · {t.type} · {STATUS_LABEL[t.status]}
+          </div>
         </div>
       ))}
-      <p style={{ fontSize: 12, color: "#999" }}>Tip: click a task to change its status.</p>
     </div>
   );
 }
